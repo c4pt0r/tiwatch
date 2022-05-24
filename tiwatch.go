@@ -30,6 +30,19 @@ type TiWatch struct {
 	versions map[string]int64
 }
 
+type OpType int
+
+const (
+	TypeDelete OpType = iota
+	TypeUpdate
+)
+
+type Op struct {
+	Type OpType
+	Key  string
+	Val  string
+}
+
 func New(dsn string, namespace string) *TiWatch {
 	return &TiWatch{
 		dsn:      dsn,
@@ -92,6 +105,35 @@ func (b *TiWatch) Get(key string) (string, bool, error) {
 	return value, true, nil
 }
 
+func (b *TiWatch) Delete(key string) error {
+	txn, err := b.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer txn.Rollback()
+
+	_, err = txn.Exec(fmt.Sprintf(`
+		SELECT 
+			k 
+		FROM
+			%s
+		WHERE k = ?
+		FOR UPDATE
+	`, genTableName(b.ns)), key)
+	if err != nil {
+		return err
+	}
+	_, err = txn.Exec(fmt.Sprintf(`
+		DELETE FROM
+			%s
+		WHERE k = ?
+	`, genTableName(b.ns)), key)
+	if err != nil {
+		return err
+	}
+	return txn.Commit()
+}
+
 func (b *TiWatch) Set(key string, value string) error {
 	txn, err := b.db.Begin()
 	if err != nil {
@@ -140,8 +182,8 @@ func (b *TiWatch) getMaxVersion(key string) (int64, error) {
 	return version, nil
 }
 
-func (b *TiWatch) Watch(key string) <-chan string {
-	ch := make(chan string)
+func (b *TiWatch) Watch(key string) <-chan Op {
+	ch := make(chan Op)
 	go func() {
 		for {
 			var err error
@@ -164,6 +206,16 @@ func (b *TiWatch) Watch(key string) <-chan string {
 				log.Error(err)
 				continue
 			}
+			// if remote version is greater than local version, we need to update local version
+			// someone else must delete the key
+			if remoteVersion == 0 && version > 0 {
+				ch <- Op{
+					Type: TypeDelete,
+					Key:  key,
+				}
+				b.versions[key] = 0
+				continue
+			}
 			// if remote version is greater than local version, get value
 			if remoteVersion > version {
 				value, _, err := b.Get(key)
@@ -171,7 +223,7 @@ func (b *TiWatch) Watch(key string) <-chan string {
 					log.Error(err)
 					continue
 				}
-				ch <- value
+				ch <- Op{Type: TypeUpdate, Key: key, Val: value}
 				b.versions[key] = remoteVersion
 			} else {
 				// if remote version is less than or equal to local version, sleep

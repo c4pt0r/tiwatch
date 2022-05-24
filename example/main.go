@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"time"
 	"tiwatch"
 
@@ -29,6 +30,10 @@ func main() {
 				log.I("SEND")
 				w.Set("hello", time.Now().String())
 				time.Sleep(time.Second)
+
+				if rand.Intn(2) == 0 {
+					w.Delete("hello")
+				}
 			}
 		}()
 	}
