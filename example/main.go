@@ -4,9 +4,9 @@ import (
 	"flag"
 	"math/rand"
 	"time"
-	"tiwatch"
 
 	"github.com/c4pt0r/log"
+	"github.com/c4pt0r/tiwatch"
 )
 
 var (
@@ -32,11 +32,13 @@ func main() {
 				time.Sleep(time.Second)
 
 				if rand.Intn(2) == 0 {
+					log.I("DEL")
 					w.Delete("hello")
 				}
 			}
 		}()
 	}
+
 	for {
 		select {
 		case m := <-ch:

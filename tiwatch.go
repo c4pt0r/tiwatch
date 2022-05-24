@@ -62,7 +62,16 @@ func (b *TiWatch) Init() error {
 	if err != nil {
 		return err
 	}
+
+	b.db.SetConnMaxLifetime(time.Minute * 3)
+	b.db.SetMaxOpenConns(50)
+	b.db.SetMaxIdleConns(50)
+
 	return b.createTables()
+}
+
+func (b *TiWatch) DB() *sql.DB {
+	return b.db
 }
 
 func (b *TiWatch) createTables() error {
