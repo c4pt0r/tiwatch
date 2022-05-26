@@ -4,6 +4,21 @@ Watch API at scale, using TiDB as backend
 # Usage
 
 ```Go
+package main
+
+import (
+	"flag"
+	"math/rand"
+	"time"
+
+	"github.com/c4pt0r/log"
+	"github.com/c4pt0r/tiwatch"
+)
+
+var (
+	watchOnly = flag.Bool("watch-only", false, "watch only")
+)
+
 func main() {
 	flag.Parse()
 	dsn := "root:@tcp(localhost:4000)/test"
@@ -29,11 +44,11 @@ func main() {
 			}
 		}()
 	}
-
 	for {
 		select {
 		case m := <-ch:
 			log.Infof("RECV: %s", m)
 		}
 	}
+}
 ```
